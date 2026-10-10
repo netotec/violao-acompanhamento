@@ -1,0 +1,12 @@
+# Configuração local do clasp (contém o ID do seu projeto)
+.clasp.json
+.clasprc.json
+
+# Planilhas e exportações com dados de alunos: nunca publicar
+*.xlsx
+*.csv
+dados/
+
+node_modules/
+.DS_Store
+Thumbs.db

@@ -111,6 +111,17 @@ Depois siga os passos 4 a 7 acima. Use `.clasp.json.example` como modelo. O arqu
 
 Para abrir o painel no celular, use **Violão > Link do painel no celular**. Guarde esse link só para você. Se ele vazar, use **Violão > Trocar chave do painel**.
 
+## Usar como app no celular (PWA)
+
+A pasta [`docs/`](docs) tem um **app instalável** que roda de graça no GitHub Pages. Ele abre a página do aluno ou o painel em tela cheia, com ícone próprio na tela do celular.
+
+1. No GitHub, abra **Settings > Pages**. Em **Branch**, escolha `main` e a pasta `/docs`, e clique em **Save**. Em alguns minutos o app fica no ar em `https://SEU-USUARIO.github.io/violao-acompanhamento/`.
+2. Em `docs/config.js`, coloque a URL do **seu** web app (a que termina em `/exec`).
+3. Na planilha, use **Violão > Definir endereço do app (GitHub Pages)** e cole o endereço do passo 1. A partir daí, os links enviados aos alunos abrem pelo app.
+4. O aluno abre o link do WhatsApp e toca em **Instalar** (Android) ou em **Compartilhar > Adicionar à Tela de Início** (iPhone).
+
+O app lembra do último link aberto no aparelho. Quando o professor manda um link novo, basta abrir pelo WhatsApp de novo.
+
 ## Atualizando o código
 
 Depois de alterar os arquivos, vá em **Implantar > Gerenciar implantações > ✏️ Editar > Versão: Nova versão > Implantar**. Assim a URL continua a mesma e os links já enviados seguem funcionando.
@@ -135,6 +146,7 @@ src/
   Index.html       página do aluno
   Painel.html      painel do professor
   appsscript.json  manifesto do projeto
+docs/              app instalável (GitHub Pages): index.html, manifest, service worker e ícones
 docs/imagens/      capturas de tela
 ```
 

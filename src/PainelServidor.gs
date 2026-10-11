@@ -45,7 +45,7 @@ function linkPainelCelular() {
     SpreadsheetApp.getUi().alert('Salve a URL do web app em Violão > Definir URL do web app primeiro.');
     return;
   }
-  const url = urlApp_() + '?p=painel&k=' + chavePainel_();
+  const url = urlPublica_() + '?p=painel&k=' + chavePainel_();
   const html = HtmlService.createHtmlOutput(
     '<div style="font:14px Arial;padding:8px">' +
     '<p><b>Link do seu painel no celular.</b> Guarde só para você: quem tiver este link consegue abrir o painel.</p>' +
@@ -65,12 +65,14 @@ function trocarChavePainel() {
 /** Chamado pelo doGet quando a URL tem ?p=painel&k=... */
 function paginaPainel_(k) {
   try { checarChave_(k); } catch (e) {
-    return HtmlService.createHtmlOutput('<p style="font:16px Arial;padding:24px">Acesso negado.</p>').setTitle('Painel');
+    return HtmlService.createHtmlOutput('<p style="font:16px Arial;padding:24px">Acesso negado.</p>').setTitle('Painel')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
   const t = HtmlService.createTemplateFromFile('Painel');
   t.chave = k;
   t.modo = 'web';
-  return t.evaluate().setTitle('Painel do professor – Violão').addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  return t.evaluate().setTitle('Painel do professor – Violão').addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 /* ---------- Ajudantes ---------- */
@@ -243,7 +245,7 @@ function painelCriarEnvio(k, idAluno, idAula, validadeIso) {
   if (validade < hoje_()) throw new Error('A validade precisa ser hoje ou depois.');
 
   const token = Utilities.getUuid().replace(/-/g, '').slice(0, 16);
-  const link = URL + '?t=' + token;
+  const link = urlPublica_() + '?t=' + token;
   const primeiro = String(aluno.Nome || '').split(' ')[0];
   const msg = 'Olá, ' + primeiro + '! Seus exercícios da Aula ' + aula.Numero + ' (' + aula.Titulo + '). ' +
     'Marque cada dia que praticar. Link válido até ' + data_(validade) + ': ' + link;

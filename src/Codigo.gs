@@ -32,6 +32,7 @@ function onOpen() {
     .addItem('Ativar automação (AppSheet)', 'ativarAutomacao')
     .addSeparator()
     .addItem('Definir URL do web app', 'definirUrlApp')
+    .addItem('Definir endereço do app (GitHub Pages)', 'definirEnderecoApp')
     .addItem('Trocar chave do painel', 'trocarChavePainel')
     .addToUi();
 }
@@ -54,6 +55,26 @@ function urlApp_() {
     if (/\/exec$/.test(auto)) return auto;
   } catch (e) {}
   return '';
+}
+
+/** Endereço que vai nos links enviados aos alunos: o app instalável (GitHub Pages) ou, se não houver, o web app. */
+function urlPublica_() {
+  const app = PropertiesService.getScriptProperties().getProperty('URL_PUBLICA') || '';
+  return /^https:\/\//.test(app) ? app.replace(/\/?$/, '/') : urlApp_();
+}
+
+function definirEnderecoApp() {
+  soDono_();
+  const ui = SpreadsheetApp.getUi();
+  const r = ui.prompt('Endereço do app',
+    'Cole o endereço do GitHub Pages (ex.: https://seuusuario.github.io/violao-acompanhamento/).\nDeixe em branco para voltar a usar o link direto do Google.', ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  const url = r.getResponseText().trim();
+  const props = PropertiesService.getScriptProperties();
+  if (!url) { props.deleteProperty('URL_PUBLICA'); ui.alert('Os links voltam a usar o endereço do Google.'); return; }
+  if (!/^https:\/\/[^\s]+$/.test(url)) { ui.alert('Endereço inválido: ele precisa começar com https://'); return; }
+  props.setProperty('URL_PUBLICA', url);
+  ui.alert('Pronto! Os próximos links já vão abrir pelo app.');
 }
 
 function definirUrlApp() {
@@ -100,7 +121,7 @@ function gerarLinks() {
     if (!l[c('ID_Aluno')] || !l[c('ID_Aula')] || l[c('Token')]) continue;
     if (!l[c('Data_Envio')]) l[c('Data_Envio')] = new Date();
     const token = Utilities.getUuid().replace(/-/g, '').slice(0, 16);
-    const link = URL + '?t=' + token;
+    const link = urlPublica_() + '?t=' + token;
     const aluno = alunos.find(a => a.ID_Aluno === l[c('ID_Aluno')]) || {};
     const aula = aulas.find(a => a.ID_Aula === l[c('ID_Aula')]) || {};
     const primeiroNome = String(aluno.Nome || '').split(' ')[0];
@@ -183,6 +204,7 @@ function doGet(e) {
   const tpl = HtmlService.createTemplateFromFile('Index');
   tpl.dados = JSON.stringify(ctx).replace(/</g, '\\u003c');
   return tpl.evaluate()
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL) // permite abrir dentro do app (GitHub Pages)
     .setTitle('Violão – Meus exercícios')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }

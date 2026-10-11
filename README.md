@@ -110,7 +110,7 @@ Depois siga os passos 4 a 7 acima. Use `.clasp.json.example` como modelo. O arqu
 3. **No começo do mês**, use **Agendar próximas aulas** na aba Frequência.
 4. **Se o aluno trocar de celular**, use **Liberar aparelho novo** na aba Alunos.
 
-Para abrir o painel no celular, use **Violão > Link do painel no celular**. Guarde esse link só para você. Se ele vazar, use **Violão > Trocar chave do painel**.
+Para abrir o painel no celular ou em outro computador, use **Violão > Painel no celular ou computador**. O painel pede a sua senha.
 
 ## Usar como app no celular (PWA)
 

@@ -61,6 +61,8 @@
   .bt:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline:3px solid var(--ambar); outline-offset:1px; }
   a.bt { text-decoration:none; display:inline-flex; align-items:center; gap:6px; color:inherit; }
   a.bt.zap { background:#1f8f4e; color:#fff; border:0; }
+  #sair { background:transparent; color:var(--marcador); border-color:rgba(239,230,210,.45); position:relative; }
+  #sair:hover { background:rgba(0,0,0,.25); }
 
   label.campo { display:block; font-weight:800; font-size:13px; margin:10px 0 4px; }
   select, input[type=text], input[type=tel], input[type=number], input[type=date], input[type=time], textarea {
@@ -108,7 +110,7 @@
 <body>
 <header>
   <div class="topo">
-    <h1>Painel do professor</h1>
+    <div class="linha entre"><h1>Painel do professor</h1><button class="bt peq" id="sair" type="button" hidden>Sair</button></div>
     <p id="hoje">Violão · acompanhamento das aulas</p>
     <nav id="abas" role="tablist"></nav>
   </div>
@@ -117,7 +119,7 @@
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>
-  const CHAVE = <?!= JSON.stringify(chave) ?>;
+  let CHAVE = <?!= JSON.stringify(chave) ?>;
   const MODO = <?!= JSON.stringify(modo) ?>;
   let D = null;
   let aba = 'geral';
@@ -125,7 +127,8 @@
   let preEnvio = {};
   let ultimoEnvio = null;
   const app = document.getElementById('app');
-  const ABAS = [['geral', 'Visão geral'], ['enviar', 'Enviar link'], ['freq', 'Frequência'], ['alunos', 'Alunos'], ['disp', 'Disponibilidade'], ['praticas', 'Práticas']];
+  const ABAS = [['geral', 'Visão geral'], ['enviar', 'Enviar link'], ['freq', 'Frequência'], ['aulas', 'Aulas'], ['alunos', 'Alunos'], ['disp', 'Disponibilidade'], ['praticas', 'Práticas']];
+  let aulaAberta = '';
   const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
   const MOTIVOS = ['Doença', 'Trabalho', 'Estudos', 'Viagem', 'Compromisso familiar', 'Transporte', 'Esqueceu', 'Outro'];
 
@@ -143,9 +146,51 @@
   }
   function chamar(fn, ...args) {
     return new Promise((ok, falha) => {
-      google.script.run.withSuccessHandler(ok).withFailureHandler(e => falha(new Error(String(e.message || e).replace(/^Error:\s*/, ''))))[fn](CHAVE, ...args);
+      google.script.run.withSuccessHandler(ok).withFailureHandler(e => {
+        const msg = String(e.message || e).replace(/^Error:\s*/, '');
+        if (/^SESSAO:/.test(msg)) { esquecerSessao(); telaLogin(msg.replace(/^SESSAO:\s*/, '')); falha(new Error('Entre de novo com a senha.')); return; }
+        falha(new Error(msg));
+      })[fn](CHAVE, ...args);
     });
   }
+
+  /* ---------- login (só no app/web; dentro da planilha não precisa) ---------- */
+  const guardar = (k, v, longo) => { try { (longo ? localStorage : sessionStorage).setItem(k, v); } catch (e) {} };
+  const ler = k => { try { return localStorage.getItem(k) || sessionStorage.getItem(k) || ''; } catch (e) { return ''; } };
+  function esquecerSessao() { try { localStorage.removeItem('violao_sessao'); sessionStorage.removeItem('violao_sessao'); } catch (e) {} CHAVE = ''; }
+  function telaLogin(aviso) {
+    document.getElementById('abas').innerHTML = '';
+    document.getElementById('sair').hidden = true;
+    app.innerHTML = '';
+    const senha = el('input', { type: 'password', id: 'senha', autocomplete: 'current-password', placeholder: 'Sua senha' });
+    const lembrar = el('input', { type: 'checkbox', id: 'lembrar', checked: true });
+    const msg = el('div', { class: 'mut', role: 'status', style: 'margin-top:10px;min-height:1.4em' }, aviso || '');
+    const entrar = async btn => {
+      if (!senha.value) { msg.textContent = 'Digite a senha.'; return; }
+      btn.disabled = true; btn.textContent = 'Entrando…';
+      google.script.run.withSuccessHandler(token => {
+        CHAVE = token; guardar('violao_sessao', token, lembrar.checked); carregar();
+      }).withFailureHandler(e => {
+        btn.disabled = false; btn.textContent = 'Entrar';
+        msg.textContent = String(e.message || e).replace(/^Error:\s*/, ''); msg.style.color = 'var(--alerta)';
+        senha.select();
+      }).painelLogin(senha.value, lembrar.checked);
+    };
+    const bt = el('button', { class: 'bt pri', type: 'button', style: 'width:100%;margin-top:14px;padding:12px', onclick: e => entrar(e.currentTarget) }, 'Entrar');
+    senha.addEventListener('keydown', e => { if (e.key === 'Enter') entrar(bt); });
+    app.append(el('div', { class: 'cartao', style: 'max-width:380px;margin:30px auto' },
+      el('h2', { style: 'margin-top:0' }, '🔒 Área do professor'),
+      el('p', { class: 'mut', style: 'margin-top:-6px' }, 'Digite a senha do painel para continuar.'),
+      el('label', { class: 'campo', for: 'senha' }, 'Senha'), senha,
+      el('label', { class: 'linha', style: 'margin-top:10px;font-size:14px;cursor:pointer' }, lembrar, 'Lembrar neste aparelho por 30 dias'),
+      bt, msg));
+    setTimeout(() => senha.focus(), 50);
+  }
+  document.getElementById('sair').addEventListener('click', () => {
+    const k = CHAVE; esquecerSessao();
+    google.script.run.withSuccessHandler(() => {}).withFailureHandler(() => {}).painelSair(k);
+    telaLogin('Você saiu do painel.');
+  });
   let tToast;
   function toast(msg, erro) {
     const t = document.getElementById('toast');
@@ -179,6 +224,7 @@
     if (!silencioso) app.innerHTML = '<div class="carregando">♪ Carregando…</div>';
     try {
       D = await chamar('painelDados');
+      document.getElementById('sair').hidden = MODO !== 'web';
       document.getElementById('hoje').textContent = 'Hoje é ' + diaSemana(D.hoje).toLowerCase() + ', ' + br(D.hoje);
       render();
     } catch (e) {
@@ -192,7 +238,7 @@
     const nav = document.getElementById('abas'); nav.innerHTML = '';
     ABAS.forEach(([id, t]) => nav.append(el('button', { role: 'tab', 'aria-selected': id === aba ? 'true' : 'false', class: id === aba ? 'on' : '', onclick: () => irPara(id) }, t)));
     app.innerHTML = '';
-    ({ geral: telaGeral, enviar: telaEnviar, freq: telaFreq, alunos: telaAlunos, disp: telaDisp, praticas: telaPraticas })[aba]();
+    ({ geral: telaGeral, enviar: telaEnviar, freq: telaFreq, aulas: telaAulas, alunos: telaAlunos, disp: telaDisp, praticas: telaPraticas })[aba]();
   }
 
   /* ---------- Visão geral ---------- */
@@ -475,7 +521,75 @@
     app.append(c);
   }
 
-  carregar();
+  /* ---------- Aulas ---------- */
+  function telaAulas() {
+    app.append(el('div', { class: 'linha entre' }, el('h2', {}, 'Aulas do programa'),
+      el('button', { class: 'bt escuro', onclick: e => acao(e.currentTarget, async () => {
+        const r = await chamar('painelNovaAula'); aulaAberta = r.id; toast('Aula ' + r.numero + ' criada. Edite o conteúdo e os exercícios.'); await carregar(true);
+      }) }, '+ Nova aula')));
+    app.append(el('p', { class: 'sub' }, 'É isto que o aluno vê no link de cada aula. Toque numa aula para ver ou editar.'));
+    D.aulas.forEach(a => {
+      const aberta = aulaAberta === a.id;
+      const c = el('div', { class: 'cartao', style: 'margin-bottom:10px' + (aberta ? ';border-color:var(--ambar)' : '') });
+      const cab = el('button', { type: 'button', class: 'linha entre', 'aria-expanded': aberta ? 'true' : 'false',
+        style: 'width:100%;border:0;background:none;padding:0;cursor:pointer;text-align:left',
+        onclick: () => { aulaAberta = aberta ? '' : a.id; render(); } },
+        el('div', { style: 'min-width:0' }, el('div', { class: 'mut' }, 'Aula ' + a.numero), el('h3', {}, a.titulo)),
+        el('div', { class: 'linha' }, el('span', { class: 'selo s-neutro' }, a.exercicios.length + (a.exercicios.length === 1 ? ' exercício' : ' exercícios')),
+          a.apostila ? el('span', { class: 'selo s-ok' }, 'Apostila') : null, el('span', { class: 'mut' }, aberta ? '▲' : '▼')));
+      c.append(cab);
+      if (!aberta) {
+        if (a.tarefa) c.append(el('div', { class: 'mut', style: 'margin-top:6px' }, 'Tarefa: ' + a.tarefa));
+      } else c.append(editorAula(a));
+      app.append(c);
+    });
+  }
+  function editorAula(a) {
+    const box = el('div', { style: 'margin-top:10px' });
+    const titulo = el('input', { type: 'text', value: a.titulo, maxlength: 80 });
+    const conteudo = el('textarea', { rows: 3, maxlength: 500 }); conteudo.value = a.conteudo;
+    const tarefa = el('textarea', { rows: 2, maxlength: 300 }); tarefa.value = a.tarefa;
+    const apostila = el('input', { type: 'text', value: a.apostila, placeholder: 'https://… (Google Docs, PDF no Drive…)' });
+    const exs = a.exercicios.map(x => Object.assign({}, x));
+    const lista = el('div');
+    function desenhar() {
+      lista.innerHTML = '';
+      exs.forEach((x, i) => {
+        const t = el('input', { type: 'text', value: x.titulo, maxlength: 80, placeholder: 'Nome do exercício' }); t.oninput = () => { x.titulo = t.value; };
+        const d = el('textarea', { rows: 2, maxlength: 400, placeholder: 'Como fazer' }); d.value = x.descricao; d.oninput = () => { x.descricao = d.value; };
+        const m = el('input', { type: 'number', min: 0, max: 120, value: x.tempo, style: 'width:90px' }); m.oninput = () => { x.tempo = m.value; };
+        lista.append(el('div', { style: 'background:var(--papel);border-radius:10px;padding:10px;margin-bottom:8px' },
+          el('div', { class: 'linha entre' }, el('b', {}, '♪ Exercício ' + (i + 1)),
+            el('div', { class: 'linha' },
+              i > 0 ? el('button', { class: 'bt peq', type: 'button', 'aria-label': 'Subir', onclick: () => { exs.splice(i - 1, 0, exs.splice(i, 1)[0]); desenhar(); } }, '↑') : null,
+              i < exs.length - 1 ? el('button', { class: 'bt peq', type: 'button', 'aria-label': 'Descer', onclick: () => { exs.splice(i + 1, 0, exs.splice(i, 1)[0]); desenhar(); } }, '↓') : null,
+              el('button', { class: 'bt peq', type: 'button', onclick: () => { exs.splice(i, 1); desenhar(); } }, 'Remover'))),
+          el('label', { class: 'campo' }, 'Nome'), t, el('label', { class: 'campo' }, 'Descrição'), d,
+          el('label', { class: 'campo' }, 'Tempo (min)'), m));
+      });
+    }
+    desenhar();
+    box.append(el('label', { class: 'campo' }, 'Título'), titulo,
+      el('label', { class: 'campo' }, 'Conteúdo da aula (o que você ensina)'), conteudo,
+      el('label', { class: 'campo' }, 'Tarefa da semana (aparece para o aluno)'), tarefa,
+      el('label', { class: 'campo' }, 'Link da apostila (opcional)'), apostila,
+      el('div', { class: 'mut', style: 'margin-top:4px' }, 'Use um link que o aluno consiga abrir, como um Google Docs ou PDF compartilhado com "qualquer pessoa com o link".'),
+      el('h3', { style: 'margin:16px 0 8px' }, 'Exercícios'), lista,
+      el('button', { class: 'bt peq', type: 'button', onclick: () => { exs.push({ id: '', titulo: '', descricao: '', tempo: 5 }); desenhar(); } }, '+ Adicionar exercício'),
+      el('div', { class: 'linha', style: 'margin-top:14px' },
+        el('button', { class: 'bt pri', type: 'button', onclick: e => acao(e.currentTarget, async () => {
+          await chamar('painelSalvarAula', { id: a.id, titulo: titulo.value, conteudo: conteudo.value, tarefa: tarefa.value, apostila: apostila.value }, exs);
+          toast('Aula ' + a.numero + ' salva. Os alunos já veem a versão nova.'); await carregar(true);
+        }) }, 'Salvar aula'),
+        a.apostila ? el('a', { class: 'bt', href: a.apostila, target: '_blank', rel: 'noopener' }, 'Abrir apostila') : null));
+    return box;
+  }
+
+  // início: dentro da planilha já entra; no app/web usa a sessão salva ou pede a senha
+  if (MODO === 'web' && !CHAVE) {
+    const salva = ler('violao_sessao');
+    if (/^[a-f0-9]{40,64}$/.test(salva)) { CHAVE = salva; carregar(); } else telaLogin();
+  } else carregar();
 </script>
 </body>
 </html>

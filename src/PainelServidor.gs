@@ -1,12 +1,13 @@
 /**
  * PainelServidor.gs – Painel do professor (servidor)
- * Abra pelo menu Violão > Abrir painel do professor (na planilha)
- * ou pelo celular com o link secreto (Violão > Link do painel no celular).
- * Todas as funções do painel exigem a chave secreta, guardada nas propriedades do script.
+ * Na planilha: menu Violão > Abrir painel do professor (não pede senha: só o dono abre).
+ * No celular/computador: app do professor (GitHub Pages) ou URL do web app + ?p=painel, com senha.
+ * A senha é guardada só como hash (SHA-256 com sal) nas propriedades do script.
  */
 
 /* ---------- Segurança ---------- */
 
+/** Chave interna usada pelo painel aberto dentro da planilha. */
 function chavePainel_() {
   const p = PropertiesService.getScriptProperties();
   let k = p.getProperty('PAINEL_CHAVE');
@@ -17,9 +18,18 @@ function chavePainel_() {
   return k;
 }
 
+/** Aceita a chave interna (planilha) ou uma sessão válida criada pelo login com senha. */
 function checarChave_(k) {
-  const certa = PropertiesService.getScriptProperties().getProperty('PAINEL_CHAVE');
-  if (!k || !certa || String(k) !== certa) throw new Error('Acesso negado.');
+  k = String(k || '');
+  const props = PropertiesService.getScriptProperties();
+  const certa = props.getProperty('PAINEL_CHAVE');
+  if (k && certa && k === certa) return;
+  if (/^[a-f0-9]{40,64}$/.test(k)) {
+    const validade = Number(props.getProperty('SESS_' + k) || 0);
+    if (validade > Date.now()) return;
+    if (validade) props.deleteProperty('SESS_' + k);
+  }
+  throw new Error('SESSAO: Sua sessão terminou. Entre de novo com a senha.');
 }
 
 /** Bloqueia funções administrativas quando chamadas pela página pública. */
@@ -27,6 +37,72 @@ function soDono_() {
   const ativo = Session.getActiveUser().getEmail();
   const dono = Session.getEffectiveUser().getEmail();
   if (!ativo || ativo !== dono) throw new Error('Acesso negado.');
+}
+
+function hashSenha_(senha, sal) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, sal + '|' + senha, Utilities.Charset.UTF_8);
+  return bytes.map(b => ('0' + (b & 0xff).toString(16)).slice(-2)).join('');
+}
+
+function definirSenhaPainel() {
+  soDono_();
+  const ui = SpreadsheetApp.getUi();
+  const r = ui.prompt('Senha do painel do professor', 'Digite a nova senha (mínimo 6 caracteres):', ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  const senha = r.getResponseText();
+  if (senha.length < 6) { ui.alert('A senha precisa ter pelo menos 6 caracteres.'); return; }
+  const r2 = ui.prompt('Confirme a senha', 'Digite a mesma senha de novo:', ui.ButtonSet.OK_CANCEL);
+  if (r2.getSelectedButton() !== ui.Button.OK) return;
+  if (r2.getResponseText() !== senha) { ui.alert('As senhas não são iguais. Nada foi alterado.'); return; }
+  const sal = Utilities.getUuid();
+  const props = PropertiesService.getScriptProperties();
+  props.setProperties({ PAINEL_SAL: sal, PAINEL_SENHA: hashSenha_(senha, sal) });
+  encerrarSessoes_();
+  ui.alert('Senha salva. Por segurança, todos os aparelhos foram desconectados: entre de novo com a senha nova.');
+}
+
+/** Login do painel: devolve um código de sessão (12 horas, ou 30 dias se "lembrar"). */
+function painelLogin(senha, lembrar) {
+  const props = PropertiesService.getScriptProperties();
+  const hash = props.getProperty('PAINEL_SENHA'), sal = props.getProperty('PAINEL_SAL');
+  if (!hash || !sal) throw new Error('A senha do painel ainda não foi criada. Na planilha, use Violão > Definir senha do painel.');
+  const cache = CacheService.getScriptCache();
+  const falhas = Number(cache.get('login_falhas') || 0);
+  if (falhas >= 5) throw new Error('Muitas tentativas erradas. Espere 15 minutos e tente de novo.');
+  Utilities.sleep(400); // atrasa tentativas automáticas
+  if (hashSenha_(String(senha || ''), sal) !== hash) {
+    cache.put('login_falhas', String(falhas + 1), 900);
+    throw new Error('Senha incorreta.' + (falhas + 1 >= 3 ? ' Restam ' + (5 - falhas - 1) + ' tentativas.' : ''));
+  }
+  cache.remove('login_falhas');
+  limparSessoesVencidas_();
+  const token = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
+  const dias = lembrar ? 30 : 0.5;
+  props.setProperty('SESS_' + token, String(Date.now() + dias * 864e5));
+  return token;
+}
+
+function painelSair(k) {
+  if (/^[a-f0-9]{40,64}$/.test(String(k || ''))) PropertiesService.getScriptProperties().deleteProperty('SESS_' + k);
+  return true;
+}
+
+function limparSessoesVencidas_() {
+  const props = PropertiesService.getScriptProperties();
+  const todas = props.getProperties();
+  Object.keys(todas).forEach(n => { if (n.indexOf('SESS_') === 0 && Number(todas[n]) < Date.now()) props.deleteProperty(n); });
+}
+
+function encerrarSessoes_() {
+  const props = PropertiesService.getScriptProperties();
+  Object.keys(props.getProperties()).forEach(n => { if (n.indexOf('SESS_') === 0) props.deleteProperty(n); });
+}
+
+/** Menu: desconecta todos os aparelhos que entraram no painel com senha. */
+function desconectarAparelhosPainel() {
+  soDono_();
+  encerrarSessoes_();
+  SpreadsheetApp.getUi().alert('Pronto: todos os aparelhos saíram do painel. Para entrar de novo, é preciso digitar a senha.');
 }
 
 /* ---------- Abrir o painel ---------- */
@@ -41,35 +117,26 @@ function abrirPainel() {
 
 function linkPainelCelular() {
   soDono_();
-  if (!urlApp_()) {
-    SpreadsheetApp.getUi().alert('Salve a URL do web app em Violão > Definir URL do web app primeiro.');
-    return;
-  }
-  const url = urlPublica_() + '?p=painel&k=' + chavePainel_();
+  const props = PropertiesService.getScriptProperties();
+  const publica = props.getProperty('URL_PUBLICA');
+  const url = publica ? publica.replace(/\/?$/, '/') + 'professor.html' : (urlApp_() ? urlApp_() + '?p=painel' : '');
+  if (!url) { SpreadsheetApp.getUi().alert('Salve a URL do web app em Violão > Definir URL do web app primeiro.'); return; }
+  const semSenha = !props.getProperty('PAINEL_SENHA');
   const html = HtmlService.createHtmlOutput(
     '<div style="font:14px Arial;padding:8px">' +
-    '<p><b>Link do seu painel no celular.</b> Guarde só para você: quem tiver este link consegue abrir o painel.</p>' +
-    '<textarea style="width:100%;height:90px" onclick="this.select()">' + url + '</textarea>' +
-    '<p>Se o link vazar, use <b>Violão &gt; Trocar chave do painel</b> e o link antigo para de funcionar.</p></div>'
-  ).setWidth(520).setHeight(260);
+    '<p><b>Endereço do seu painel</b> (celular ou computador):</p>' +
+    '<textarea style="width:100%;height:60px" onclick="this.select()">' + url + '</textarea>' +
+    (semSenha ? '<p style="color:#a13a26"><b>Crie a senha antes:</b> Violão &gt; Definir senha do painel.</p>'
+              : '<p>Ao abrir, ele pede a sua senha. Marque "Lembrar neste aparelho" para não digitar toda vez.</p>') +
+    '<p>No celular, abra o endereço e instale como app (Compartilhar &gt; Adicionar à Tela de Início, ou Instalar).</p></div>'
+  ).setWidth(520).setHeight(300);
   SpreadsheetApp.getUi().showModalDialog(html, 'Painel no celular');
 }
 
-function trocarChavePainel() {
-  soDono_();
-  PropertiesService.getScriptProperties().deleteProperty('PAINEL_CHAVE');
-  chavePainel_();
-  SpreadsheetApp.getUi().alert('Chave trocada. Os links antigos do painel pararam de funcionar. Gere o novo em Violão > Link do painel no celular.');
-}
-
-/** Chamado pelo doGet quando a URL tem ?p=painel&k=... */
-function paginaPainel_(k) {
-  try { checarChave_(k); } catch (e) {
-    return HtmlService.createHtmlOutput('<p style="font:16px Arial;padding:24px">Acesso negado.</p>').setTitle('Painel')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  }
+/** Chamado pelo doGet quando a URL tem ?p=painel. A página pede a senha. */
+function paginaPainel_() {
   const t = HtmlService.createTemplateFromFile('Painel');
-  t.chave = k;
+  t.chave = '';
   t.modo = 'web';
   return t.evaluate().setTitle('Painel do professor – Violão').addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -131,6 +198,7 @@ function painelDados(k) {
   const envios = linhas_(ABA.envios).rows;
   const freq = linhas_('Frequencia').rows;
   const regs = linhas_(ABA.reg).rows;
+  const exs = linhas_(ABA.ex).rows;
   const dispSh = ss_().getSheetByName('Disponibilidade').getRange(2, 1, 30, 10).getValues();
   const titulo = id => { const a = aulas.find(x => x.ID_Aula === id); return a ? 'Aula ' + a.Numero + ' – ' + a.Titulo : id; };
   const txt = v => (v instanceof Date ? Utilities.formatDate(v, FUSO, 'HH:mm') : String(v == null ? '' : v));
@@ -168,7 +236,13 @@ function painelDados(k) {
       aparelhos: String(a.Aparelhos || '').split(',').filter(x => x.trim()).length,
       estilos: String(a.Estilos || ''), objetivo: String(a.Objetivo || ''), violao: String(a.Tipo_Violao || '')
     })),
-    aulas: aulas.map(a => ({ id: a.ID_Aula, numero: a.Numero, titulo: a.Titulo })),
+    aulas: aulas.slice().sort((x, y) => x.Numero - y.Numero).map(a => ({
+      id: a.ID_Aula, numero: a.Numero, titulo: String(a.Titulo || ''), conteudo: String(a.Conteudo || ''),
+      tarefa: String(a.Tarefa || ''), apostila: String(a.Link_Apostila || ''),
+      exercicios: exs.filter(x => x.ID_Aula === a.ID_Aula).sort((x, y) => x.Ordem - y.Ordem).map(x => ({
+        id: x.ID_Exercicio, titulo: String(x.Titulo || ''), descricao: String(x.Descricao || ''), tempo: Number(x.Tempo_min) || ''
+      }))
+    })),
     freq: freq.map(f => ({
       r: f._r, data: iso_(f.Data), aluno: f.ID_Aluno, aula: f.ID_Aula, aulaTitulo: titulo(f.ID_Aula),
       presenca: String(f.Presenca || ''), motivo: String(f.Motivo_Falta || ''),
@@ -390,4 +464,66 @@ function painelSalvarDisp(k, semanais, excecoes) {
     sh.getRange(2, 7, E.length, 1).setNumberFormat('dd/MM/yyyy');
   }
   return true;
+}
+
+/* ---------- Aulas e exercícios ---------- */
+
+/** Salva uma aula e a lista de exercícios dela. Exercícios removidos saem da lista (os registros antigos continuam). */
+function painelSalvarAula(k, aula, exercicios) {
+  checarChave_(k);
+  aula = aula || {};
+  const titulo = limpa_(aula.titulo, 80);
+  if (!titulo) throw new Error('Dê um título para a aula.');
+  const apostila = String(aula.apostila || '').trim();
+  if (apostila && !/^https:\/\/\S+$/.test(apostila)) throw new Error('O link da apostila precisa começar com https://');
+  const lista = (exercicios || []).slice(0, 20).map((x, i) => ({
+    id: String(x.id || ''), titulo: limpa_(x.titulo, 80), descricao: limpa_(x.descricao, 400),
+    tempo: Math.max(0, Math.min(120, Math.round(Number(x.tempo) || 0))), ordem: i + 1
+  })).filter(x => x.titulo);
+  if (!lista.length) throw new Error('A aula precisa de pelo menos um exercício.');
+
+  const trava = LockService.getScriptLock(); trava.waitLock(15000);
+  try {
+    const A = linhas_(ABA.aulas);
+    const a = A.rows.find(r => r.ID_Aula === aula.id);
+    if (!a) throw new Error('Aula não encontrada.');
+    gravar_(A.sh, A.cab, a._r, { Titulo: titulo, Conteudo: limpa_(aula.conteudo, 500), Tarefa: limpa_(aula.tarefa, 300), Link_Apostila: apostila });
+
+    const E = linhas_(ABA.ex);
+    const daAula = E.rows.filter(r => r.ID_Aula === aula.id);
+    const prefixo = 'EX' + String(aula.id).replace(/^AU/, '') + '-';
+    let maior = daAula.reduce((m, r) => Math.max(m, Number(String(r.ID_Exercicio).split('-').pop()) || 0), 0);
+    const mantidos = new Set();
+    lista.forEach(x => {
+      const existente = x.id && daAula.find(r => r.ID_Exercicio === x.id);
+      const campos = { Ordem: x.ordem, Titulo: x.titulo, Descricao: x.descricao, Tempo_min: x.tempo };
+      if (existente) {
+        gravar_(E.sh, E.cab, existente._r, campos);
+        mantidos.add(existente.ID_Exercicio);
+      } else {
+        maior += 1;
+        campos.ID_Exercicio = prefixo + maior;
+        campos.ID_Aula = aula.id;
+        gravar_(E.sh, E.cab, primeiraLinhaVazia_(E.sh), campos);
+        mantidos.add(campos.ID_Exercicio);
+      }
+    });
+    daAula.filter(r => !mantidos.has(r.ID_Exercicio)).forEach(r => E.sh.getRange(r._r, 1, 1, E.cab.length).clearContent());
+  } finally { trava.releaseLock(); }
+  return true;
+}
+
+/** Cria a próxima aula do programa (com um exercício para você editar). */
+function painelNovaAula(k) {
+  checarChave_(k);
+  const trava = LockService.getScriptLock(); trava.waitLock(15000);
+  try {
+    const A = linhas_(ABA.aulas);
+    const n = A.rows.reduce((m, r) => Math.max(m, Number(r.Numero) || 0), 0) + 1;
+    const id = 'AU' + String(n).padStart(2, '0');
+    gravar_(A.sh, A.cab, primeiraLinhaVazia_(A.sh), { ID_Aula: id, Numero: n, Titulo: 'Nova aula', Conteudo: '', Tarefa: '', Link_Apostila: '' });
+    const E = linhas_(ABA.ex);
+    gravar_(E.sh, E.cab, primeiraLinhaVazia_(E.sh), { ID_Exercicio: 'EX' + String(n).padStart(2, '0') + '-1', ID_Aula: id, Ordem: 1, Titulo: 'Primeiro exercício', Descricao: '', Tempo_min: 5 });
+    return { id: id, numero: n };
+  } finally { trava.releaseLock(); }
 }

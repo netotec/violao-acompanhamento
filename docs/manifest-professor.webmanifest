@@ -1,0 +1,31 @@
+{
+  "name": "Violão – Painel do professor",
+  "short_name": "Violão Prof.",
+  "description": "Painel do professor: alunos, links, frequência e aulas.",
+  "lang": "pt-BR",
+  "start_url": "./professor.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#2b1a12",
+  "theme_color": "#2b1a12",
+  "icons": [
+    {
+      "src": "icones/icone-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icones/icone-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icones/icone-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "./professor.html"
+}

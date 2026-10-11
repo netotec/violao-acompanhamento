@@ -92,9 +92,9 @@
 
     // 1) Qual link abrir: o que veio na URL, ou o último que foi aberto neste aparelho
     const q = new URLSearchParams(location.search);
+    if (q.get('p') === 'painel') { location.replace('professor.html'); return; } // painel tem app próprio
     let destino = new URLSearchParams();
     if (q.get('t')) destino.set('t', q.get('t'));
-    else if (q.get('p') === 'painel' && q.get('k')) { destino.set('p', 'painel'); destino.set('k', q.get('k')); }
 
     if ([...destino].length) {
       guardar('violao_link', destino.toString());
@@ -102,6 +102,7 @@
       history.replaceState(null, '', location.pathname);
     } else {
       destino = new URLSearchParams(ler('violao_link'));
+      if (!destino.get('t')) destino = new URLSearchParams(); // ignora links antigos do painel
     }
 
     const base = window.VIOLAO_APP_URL || '';

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Violão – Professor</title>
+<meta name="description" content="Exercícios de violão entre uma aula e outra.">
+<meta name="theme-color" content="#2b1a12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Violão Prof.">
+<link rel="manifest" href="manifest-professor.webmanifest">
+<link rel="icon" href="icones/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Nunito:wght@400;700;800&display=swap">
+<style>
+  :root { --madeira:#2b1a12; --madeira2:#3a2418; --corda:#d9c7a3; --marcador:#efe6d2; --papel:#fbf7ef; --ambar:#c8741f; --ambar-escuro:#9a5212;
+          --titulo:'DM Serif Display', Georgia, serif; --texto:'Nunito', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body { background:var(--madeira); color:var(--marcador); font:16px/1.5 var(--texto); overflow:hidden; }
+  #quadro { position:fixed; inset:0; width:100%; height:100%; border:0; background:var(--papel);
+            padding-top:env(safe-area-inset-top, 0px); }
+  .tela { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+          padding:calc(24px + env(safe-area-inset-top, 0px)) 24px calc(24px + env(safe-area-inset-bottom, 0px));
+          background:linear-gradient(180deg,var(--madeira2),var(--madeira)); z-index:5; transition:opacity .4s; }
+  .tela::before { content:''; position:absolute; inset:0; opacity:.25; pointer-events:none;
+                  background:repeating-linear-gradient(180deg,transparent 0 31px,var(--corda) 31px 32px); }
+  .tela > * { position:relative; max-width:420px; }
+  .tela img { width:96px; height:96px; border-radius:22px; box-shadow:0 10px 30px rgba(0,0,0,.4); }
+  .tela h1 { font-family:var(--titulo); font-weight:400; font-size:30px; margin:18px 0 6px; }
+  .tela p { color:#d8c9ad; margin:6px 0; }
+  .tela.sumir { opacity:0; pointer-events:none; }
+  .nota { display:inline-block; font-size:28px; color:var(--ambar); animation:pula 1s ease-in-out infinite; }
+  .nota:nth-child(2) { animation-delay:.15s; } .nota:nth-child(3) { animation-delay:.3s; }
+  @keyframes pula { 50% { transform:translateY(-10px); } }
+  .bt { margin-top:16px; border:0; border-radius:12px; padding:13px 20px; font:800 16px var(--texto); cursor:pointer;
+        background:linear-gradient(180deg,var(--ambar),var(--ambar-escuro)); color:#fff; }
+  .bt.claro { background:transparent; color:var(--marcador); border:1px solid rgba(239,230,210,.4); }
+  .bt:focus-visible { outline:3px solid var(--marcador); outline-offset:2px; }
+  #instalar { position:fixed; left:12px; right:12px; bottom:calc(12px + env(safe-area-inset-bottom, 0px)); z-index:10;
+              background:var(--madeira); color:var(--marcador); border-radius:14px; padding:12px 14px; display:flex; gap:12px; align-items:center;
+              box-shadow:0 8px 28px rgba(0,0,0,.45); max-width:520px; margin:0 auto; }
+  #instalar img { width:40px; height:40px; border-radius:10px; flex:none; }
+  #instalar div { flex:1; font-size:14px; line-height:1.35; }
+  #instalar b { display:block; font-size:15px; }
+  #instalar button { flex:none; border:0; border-radius:10px; padding:9px 12px; font:800 14px var(--texto); cursor:pointer; }
+  #instalar .sim { background:var(--ambar); color:#fff; }
+  #instalar .nao { background:transparent; color:#d8c9ad; padding:9px 6px; }
+  [hidden] { display:none !important; }
+  @media (prefers-reduced-motion: reduce) { .nota { animation:none; } .tela { transition:none; } }
+</style>
+</head>
+<body>
+<iframe id="quadro" title="Painel do professor" allow="clipboard-write" hidden></iframe>
+
+<div class="tela" id="carregando">
+  <img src="icones/icone-192.png" alt="">
+  <h1>Abrindo o painel…</h1>
+  <p><span class="nota">♪</span> <span class="nota">♫</span> <span class="nota">♪</span></p>
+</div>
+
+<div class="tela" id="boasvindas" hidden>
+  <img src="icones/icone-192.png" alt="">
+  <h1>Violão</h1>
+  <p>Falta configurar o endereço do web app no arquivo config.js.</p>
+</div>
+
+<div class="tela" id="semrede" hidden>
+  <img src="icones/icone-192.png" alt="">
+  <h1>Sem internet</h1>
+  <p>Conecte-se ao Wi-Fi ou aos dados móveis para registrar o seu ensaio.</p>
+  <button class="bt" type="button" onclick="location.reload()">Tentar de novo</button>
+</div>
+
+<div id="instalar" role="dialog" aria-label="Instalar o app" hidden>
+  <img src="icones/icone-192.png" alt="">
+  <div id="instalar-texto"><b>Instale o painel do professor</b>Fica um ícone na tela e abre em tela cheia.</div>
+  <button class="sim" id="instalar-sim" type="button">Instalar</button>
+  <button class="nao" id="instalar-nao" type="button" aria-label="Agora não">✕</button>
+</div>
+
+<script src="config.js"></script>
+<script>
+  (function () {
+    const $ = id => document.getElementById(id);
+    const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+    const ler = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+
+    // 1) O painel sempre abre na tela de senha (a sessão fica guardada dentro do painel)
+    const destino = new URLSearchParams({ p: 'painel' });
+
+    const base = window.VIOLAO_APP_URL || '';
+    if (![...destino].length || !/^https:\/\/script\.google\.com\/.+\/exec$/.test(base)) {
+      $('carregando').hidden = true;
+      $('boasvindas').hidden = false;
+    } else if (!navigator.onLine) {
+      $('carregando').hidden = true;
+      $('semrede').hidden = false;
+    } else {
+      const quadro = $('quadro');
+      quadro.src = base + '?' + destino.toString();
+      quadro.hidden = false;
+      quadro.addEventListener('load', () => {
+        $('carregando').classList.add('sumir');
+        setTimeout(() => { $('carregando').hidden = true; }, 450);
+      });
+      // se o Google demorar demais, tira a tela de carregamento mesmo assim
+      setTimeout(() => $('carregando').classList.add('sumir'), 12000);
+    }
+    window.addEventListener('offline', () => { if (!$('quadro').hidden) return; $('semrede').hidden = false; });
+
+    // 2) Convite para instalar (só aparece no navegador, nunca dentro do app instalado)
+    const instalado = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+    const recusou = ler('violao_prof_nao_instalar') === '1';
+    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    let pedido = null;
+    const mostrar = () => { if (!instalado && !recusou && [...destino].length) $('instalar').hidden = false; };
+
+    window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); pedido = e; mostrar(); });
+    if (ios && !instalado) {
+      $('instalar-texto').innerHTML = '<b>Instale o painel</b>Toque em <b style="display:inline">Compartilhar ⬆</b> e depois em <b style="display:inline">Adicionar à Tela de Início</b>.';
+      $('instalar-sim').hidden = true;
+      setTimeout(mostrar, 4000);
+    }
+    $('instalar-sim').addEventListener('click', async () => {
+      if (!pedido) return;
+      pedido.prompt();
+      await pedido.userChoice.catch(() => null);
+      pedido = null;
+      $('instalar').hidden = true;
+    });
+    $('instalar-nao').addEventListener('click', () => { guardar('violao_prof_nao_instalar', '1'); $('instalar').hidden = true; });
+
+    // 3) Service worker (abre mais rápido e mostra aviso sem internet)
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  })();
+</script>
+</body>
+</html>

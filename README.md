@@ -26,12 +26,13 @@ Depois de cada aula, o professor envia pelo WhatsApp um **link com validade até
 - **Agendamento automático** das próximas aulas, seguindo a ordem do programa e a disponibilidade do professor.
 - **Disponibilidade**: horários semanais (aula, reposição ou ambos) e exceções por data.
 - **Alunos**: cadastro, plano, mensalidade, liberar aparelho novo e refazer cadastro.
+- **Aulas**: ver e editar o conteúdo, a tarefa, a apostila e os exercícios de cada aula, e criar aulas novas.
 - **Práticas**: tudo o que os alunos registraram, com os comentários.
 
 **Segurança**
 - Cada link tem um código aleatório e **para de funcionar na data de validade**.
 - **Trava por aparelho**: o link só abre nos aparelhos que o aluno usou no cadastro (até 2: celular e computador).
-- O painel do professor só abre pelo menu da planilha ou por um link com chave secreta, que pode ser trocada a qualquer momento.
+- O painel do professor só abre pelo menu da planilha ou com **senha** (guardada como hash, com bloqueio após 5 tentativas erradas).
 - As funções administrativas só rodam para o dono do script.
 
 ## Capturas de tela
@@ -113,14 +114,20 @@ Para abrir o painel no celular, use **Violão > Link do painel no celular**. Gua
 
 ## Usar como app no celular (PWA)
 
-A pasta [`docs/`](docs) tem um **app instalável** que roda de graça no GitHub Pages. Ele abre a página do aluno ou o painel em tela cheia, com ícone próprio na tela do celular.
+A pasta [`docs/`](docs) tem **dois apps instaláveis** que rodam de graça no GitHub Pages:
 
-1. No GitHub, abra **Settings > Pages**. Em **Branch**, escolha `main` e a pasta `/docs`, e clique em **Save**. Em alguns minutos o app fica no ar em `https://SEU-USUARIO.github.io/violao-acompanhamento/`.
+| App | Endereço | Para quem |
+|---|---|---|
+| **Violão** | `https://SEU-USUARIO.github.io/violao-acompanhamento/` | Alunos: abre pelo link do WhatsApp e lembra do último link |
+| **Violão Prof.** | `https://SEU-USUARIO.github.io/violao-acompanhamento/professor.html` | Professor: painel protegido por senha |
+
+1. No GitHub, abra **Settings > Pages**. Em **Branch**, escolha `main` e a pasta `/docs`, e clique em **Save**.
 2. Em `docs/config.js`, coloque a URL do **seu** web app (a que termina em `/exec`).
-3. Na planilha, use **Violão > Definir endereço do app (GitHub Pages)** e cole o endereço do passo 1. A partir daí, os links enviados aos alunos abrem pelo app.
-4. O aluno abre o link do WhatsApp e toca em **Instalar** (Android) ou em **Compartilhar > Adicionar à Tela de Início** (iPhone).
+3. Na planilha, use **Violão > Definir endereço do app (GitHub Pages)** e cole o endereço do app dos alunos. A partir daí, os links enviados abrem pelo app.
+4. Na planilha, use **Violão > Definir senha do painel** para criar a senha do professor.
+5. Para instalar, abra o endereço e toque em **Instalar** (Android) ou em **Compartilhar > Adicionar à Tela de Início** (iPhone).
 
-O app lembra do último link aberto no aparelho. Quando o professor manda um link novo, basta abrir pelo WhatsApp de novo.
+O painel pede a senha e pode lembrar o aparelho por 30 dias. A senha fica guardada só como hash (SHA-256 com sal). Depois de 5 tentativas erradas, o acesso é bloqueado por 15 minutos. **Violão > Desconectar todos os aparelhos do painel** encerra todas as sessões.
 
 ## Atualizando o código
 

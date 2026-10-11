@@ -24,7 +24,8 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Violão')
     .addItem('Abrir painel do professor', 'abrirPainel')
-    .addItem('Link do painel no celular', 'linkPainelCelular')
+    .addItem('Painel no celular ou computador', 'linkPainelCelular')
+    .addItem('Definir senha do painel', 'definirSenhaPainel')
     .addSeparator()
     .addItem('Gerar links pendentes', 'gerarLinks')
     .addSeparator()
@@ -33,7 +34,7 @@ function onOpen() {
     .addSeparator()
     .addItem('Definir URL do web app', 'definirUrlApp')
     .addItem('Definir endereço do app (GitHub Pages)', 'definirEnderecoApp')
-    .addItem('Trocar chave do painel', 'trocarChavePainel')
+    .addItem('Desconectar todos os aparelhos do painel', 'desconectarAparelhosPainel')
     .addToUi();
 }
 
@@ -199,7 +200,7 @@ function publico_(token) {
 }
 
 function doGet(e) {
-  if (e && e.parameter && e.parameter.p === 'painel') return paginaPainel_(String(e.parameter.k || ''));
+  if (e && e.parameter && e.parameter.p === 'painel') return paginaPainel_();
   const ctx = publico_(String((e && e.parameter && e.parameter.t) || '').trim());
   const tpl = HtmlService.createTemplateFromFile('Index');
   tpl.dados = JSON.stringify(ctx).replace(/</g, '\\u003c');

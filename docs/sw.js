@@ -1,7 +1,7 @@
 // Service worker: guarda a "casca" do app para abrir rápido e mostrar um aviso sem internet.
 // Os dados (exercícios, registros) sempre vêm do Google, nunca do cache.
-const CACHE = 'violao-v1';
-const ARQUIVOS = ['./', './index.html', './config.js', './manifest.webmanifest',
+const CACHE = 'violao-v2';
+const ARQUIVOS = ['./', './index.html', './professor.html', './config.js', './manifest.webmanifest', './manifest-professor.webmanifest',
   './icones/icone-192.png', './icones/icone-512.png', './icones/apple-touch-icon.png', './icones/favicon.png'];
 
 self.addEventListener('install', e => {
